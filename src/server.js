@@ -8,11 +8,16 @@ const port = 621
 
 const CUPS_URL = 'http://localhost:631/printers/';
 
+/**
+ * Get list of available printers
+ *
+ * @param callback{function}
+ */
 const getPrinterUrls = (callback) => {
-    request(CUPS_URL, function (error, response, body) {
+    request(CUPS_URL, (error, response, body) => {
+        let printerUrls = [];
         if (!error && response.statusCode === 200) {
             const printersMatches = body.match(/<A HREF="\/printers\/([^"]+)">/gm);
-            let printerUrls = [];
             let i;
             if (printersMatches) {
                 for (i = 0; i < printersMatches.length; i++) {
@@ -27,19 +32,29 @@ const getPrinterUrls = (callback) => {
     });
 }
 
+/**
+ * Get printer object by printer name
+ *
+ * @param printerName{string}
+ * @returns {Printer}
+ */
 const getPrinter = (printerName) => {
     return ipp.Printer(CUPS_URL + printerName, {});
 }
 
-const print = (printer, bufferToBePrinted, callback) => {
-    printer.execute("Get-Printer-Attributes", null, function (err, printerStatus) {
+/**
+ * Print from buffer
+ *
+ * @param printer{Printer}
+ * @param bufferToBePrinted{Buffer}
+ */
+const print = (printer, bufferToBePrinted) => {
+    printer.execute("Get-Printer-Attributes", null, (err, printerStatus) => {
+        if (err) throw new Error(err);
         console.log(printerStatus);
+
         if (printerStatus.statusCode !== 'idle') {
-            callback(
-                new Error('Printer is not ready!'),
-                null
-            );
-            return;
+            throw new Error('Printer is not ready!');
         }
 
         printer.execute("Print-Job",
@@ -51,27 +66,32 @@ const print = (printer, bufferToBePrinted, callback) => {
                 "job-attributes-tag": {},
                 data: bufferToBePrinted
             },
-            function (err, res) {
+            (err, res) => {
+                if (err) throw new Error(err);
+                console.log(res);
+
                 if (res.statusCode !== 'successful-ok') {
-                    callback(new Error('Error sending job to printer!'), null);
-                    return;
+                    throw new Error('Error sending job to printer!');
                 }
 
                 let jobUri = res['job-attributes-tag']['job-uri'];
                 let tries = 0;
-                let t = setInterval(function () {
-                    printer.execute("Get-Job-Attributes",
+                let t = setInterval(() => {
+                    printer.execute(
+                        "Get-Job-Attributes",
                         {"operation-attributes-tag": {'job-uri': jobUri}},
-                        function (err2, job) {
-//                            console.log(job);
-                            if (err2) throw err2;
-                            tries++;
+                        (err, job) => {
+                            if (err) throw new Error(err);
+                            console.log(job);
+
                             if (job && job["job-attributes-tag"]["job-state"] === 'completed') {
                                 clearInterval(t);
-//                                console.log('Testing if job is ready. Try N '+tries);
-                                callback(null, job);//job is successfully printed!
+                                console.log('Print success. Job parameters:');
+                                console.log(job);
+                                return;
                             }
-                            if (tries > 50) {//todo - change it to what you need!
+
+                            if (tries++ > 10) {
                                 clearInterval(t);
                                 printer.execute("Cancel-Job", {
                                     "operation-attributes-tag": {
@@ -79,14 +99,15 @@ const print = (printer, bufferToBePrinted, callback) => {
                                         "printer-uri": printer.uri, //or uncomment this two lines - one of variants should work!!!
                                         "job-id": job["job-attributes-tag"]["job-id"]
                                     }
-                                }, function (err, res) {
-                                    if (err) throw err;
-                                    console.log('Job with id ' + job["job-attributes-tag"]["job-id"] + 'is being canceled');
+                                }, (err, res) => {
+                                    if (err) throw new Error(err);
+                                    console.log('Job with id ' + job["job-attributes-tag"]["job-id"] + ' is being canceled');
                                 });
 
-                                callback(new Error('Job is canceled - too many tries and job is not printed!'), null);
+                                throw new Error('Job is canceled - too many tries and job is not printed!');
                             }
-                        });
+                        }
+                    );
                 }, 2000);
             });
     });
@@ -95,7 +116,7 @@ const print = (printer, bufferToBePrinted, callback) => {
 app.get('/test', (req, res) => {
     res.send('testing...');
 
-    fs.readFile('print_test.txt', function (err, buffer) {
+    fs.readFile('print_test.txt',  (err, buffer) => {
         if (err) {
             console.error("Failed to read file print_test.txt");
             return;
@@ -103,15 +124,7 @@ app.get('/test', (req, res) => {
 
         const printer = getPrinter('DYMO_LW_4XL');
         // const buffer = new Buffer(data, 'binary');
-        print(printer, buffer, function (err, job) {
-            if (err) {
-                console.error('Failed to print, details below:');
-                console.error(err);
-            } else {
-                console.log('Print success. Job parameters are:');
-                console.log(job);
-            }
-        })
+        print(printer, buffer)
     });
 })
 
