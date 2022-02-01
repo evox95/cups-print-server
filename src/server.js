@@ -2,20 +2,33 @@ const ipp = require('ipp');
 const request = require('request');
 const fs = require('fs');
 const express = require('express')
+const fileUpload = require('express-fileupload');
+const bodyParser = require('body-parser');
+const cors = require('cors');
+const os = require('os');
+require('dotenv').config();
+
+const CUPS_HOST = process.env.CUPS_HOST || '127.0.0.1';
+const CUPS_PORT = process.env.CUPS_PORT || 631;
+const APP_PORT = process.env.PORT || 3000;
 
 const app = express()
-const port = 621
+app.use(cors());
+app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({extended: true}));
+app.use(fileUpload({createParentPath: true}));
 
-const CUPS_URL = 'http://localhost:631/printers/';
+// noinspection HttpUrlsUsage
+const CUPS_URL = `http://${CUPS_HOST}:${CUPS_PORT}/printers/`;
 
 /**
  * Get list of available printers
  *
- * @param callback{function}
+ * @param callback{function(ErrnoException|null, string[])}
  */
-const getPrinterUrls = (callback) => {
+const getPrinterNames = (callback) => {
     request(CUPS_URL, (error, response, body) => {
-        let printerUrls = [];
+        let printerNames = [];
         if (!error && response.statusCode === 200) {
             const printersMatches = body.match(/<A HREF="\/printers\/([^"]+)">/gm);
             let i;
@@ -23,12 +36,12 @@ const getPrinterUrls = (callback) => {
                 for (i = 0; i < printersMatches.length; i++) {
                     const a = (/"\/printers\/([^"]+)"/).exec(printersMatches[i]);
                     if (a) {
-                        printerUrls.push(CUPS_URL + '/' + a[1]);
+                        printerNames.push(a[1]);
                     }
                 }
             }
         }
-        callback(error, printerUrls);
+        callback(error, printerNames);
     });
 }
 
@@ -48,10 +61,17 @@ const getPrinter = (printerName) => {
  * @param printer{Printer}
  * @param bufferToBePrinted{Buffer}
  * @param bufferFormat{string}
+ * @param callback{function(string)}
  */
-const print = (printer, bufferToBePrinted, bufferFormat = 'text/plain') => {
+const print = (
+    printer,
+    bufferToBePrinted,
+    bufferFormat = 'text/plain',
+    callback = (event) => {
+    }
+) => {
     printer.execute("Get-Printer-Attributes", null, (err, response) => {
-        if (err) throw new Error(err);
+        if (err) throw err;
 
         if (
             typeof response['printer-attributes-tag'] === 'undefined'
@@ -78,16 +98,18 @@ const print = (printer, bufferToBePrinted, bufferFormat = 'text/plain') => {
             {
                 "operation-attributes-tag": {
                     "requesting-user-name": "nap",
-                    // "job-name": "testing",
                     "document-format": bufferFormat,
                 },
+                // https://datatracker.ietf.org/doc/html/rfc2911#section-4.2
                 "job-attributes-tag": {
                     "orientation-requested": ORIENTATION['portrait'],
                 },
                 data: bufferToBePrinted
             },
             (err, res) => {
-                if (err) throw new Error(err);
+                callback('job-sent-to-printer');
+
+                if (err) throw err;
                 console.log(res);
 
                 if (res.statusCode !== 'successful-ok') {
@@ -103,7 +125,7 @@ const print = (printer, bufferToBePrinted, bufferFormat = 'text/plain') => {
                         "Get-Job-Attributes",
                         {"operation-attributes-tag": {'job-uri': jobUri}},
                         (err, job) => {
-                            if (err) throw new Error(err);
+                            if (err) throw err;
                             console.log(job);
 
                             if (job && job["job-attributes-tag"]["job-state"] === 'completed') {
@@ -130,7 +152,7 @@ const print = (printer, bufferToBePrinted, bufferFormat = 'text/plain') => {
                                     }
                                 },
                                 (err, res) => {
-                                    if (err) throw new Error(err);
+                                    if (err) throw err;
                                     console.log('Job with id ' + job["job-attributes-tag"]["job-id"] + ' is being canceled');
                                 }
                             );
@@ -143,21 +165,75 @@ const print = (printer, bufferToBePrinted, bufferFormat = 'text/plain') => {
     });
 }
 
+// /test
+// /test?printer={printer-name}
 app.get('/test', (req, res) => {
-    res.send('testing...');
+    res.send({success: true});
 
-    fs.readFile('print_test.pdf', (err, buffer) => {
+    fs.readFile('print_test.txt', (err, buffer) => {
         if (err) {
-            console.error("Failed to read file print_test.pdf");
-            return;
+            console.error("Failed to read file print_test.txt");
+            throw err;
         }
 
-        const printer = getPrinter('DYMO_LW_4XL');
-        // const buffer = new Buffer(data, 'binary');
-        print(printer, buffer, "application/pdf")
+        if (!req.get('printer')) {
+            getPrinterNames((err, printerNames) => {
+                if (err) throw err;
+
+                const printer = getPrinter(printerNames[0]);
+                print(printer, buffer, 'text/plain');
+            })
+        } else {
+            const printer = getPrinter(req.get('printer'));
+            print(printer, buffer, 'text/plain');
+        }
     });
 })
 
-app.listen(port, () => {
-    console.log(`CUPS printing server app is listening on port ${port}`)
+// /print-document?printer=DYMO_LW_4XL
+// /print-document?printer={printer-name}
+app.post('/print-document', async (req, res) => {
+    try {
+        if (!req.files) {
+            res.send({
+                status: false,
+                success: 'No file uploaded'
+            });
+        } else if (!req.get('printer')) {
+            res.send({
+                success: false,
+                message: 'No printer selected'
+            });
+        } else {
+            const document = req.files.document;
+            const documentFilepath = os.tmpdir() + '/' + document.name;
+            await document.mv(documentFilepath);
+
+            fs.readFile(documentFilepath, (err, buffer) => {
+                if (err) {
+                    console.error('Failed to read ' + documentFilepath);
+                    throw err;
+                }
+
+                const printer = getPrinter(req.get('printer'));
+                print(printer, buffer, document.mimetype, (event) => {
+                    switch (event) {
+                        case 'job-sent-to-printer':
+                            fs.unlink(documentFilepath, (err) => {
+                                if (err) throw err;
+                            });
+                            break;
+                    }
+                });
+            });
+
+            res.send({success: true});
+        }
+    } catch (err) {
+        res.status(500).send(err);
+    }
+})
+
+app.listen(APP_PORT, () => {
+    console.log(`CUPS printing server app is listening on port ${APP_PORT}`)
 })
