@@ -4,6 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+    "start": "node src/server.js",
+    "dev": "node-dev src/server.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
@@ -14,5 +16,8 @@
     "fs": "^0.0.1-security",
     "ipp": "^2.0.1",
     "request": "^2.88.2"
+  },
+  "devDependencies": {
+    "node-dev": "^7.1.0"
   }
 }
