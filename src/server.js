@@ -47,8 +47,9 @@ const getPrinter = (printerName) => {
  *
  * @param printer{Printer}
  * @param bufferToBePrinted{Buffer}
+ * @param bufferFormat{string}
  */
-const print = (printer, bufferToBePrinted) => {
+const print = (printer, bufferToBePrinted, bufferFormat = 'text/plain') => {
     printer.execute("Get-Printer-Attributes", null, (err, response) => {
         if (err) throw new Error(err);
 
@@ -68,7 +69,7 @@ const print = (printer, bufferToBePrinted) => {
                 "operation-attributes-tag": {
                     "requesting-user-name": "nap",
                     // "job-name": "testing",
-                    "document-format": "application/pdf",
+                    "document-format": bufferFormat,
                 },
                 "job-attributes-tag": {},
                 data: bufferToBePrinted
@@ -141,7 +142,7 @@ app.get('/test', (req, res) => {
 
         const printer = getPrinter('DYMO_LW_4XL');
         // const buffer = new Buffer(data, 'binary');
-        print(printer, buffer)
+        print(printer, buffer, "application/pdf")
     });
 })
 
