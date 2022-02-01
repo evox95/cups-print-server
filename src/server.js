@@ -57,6 +57,7 @@ const print = (printer, bufferToBePrinted) => {
             throw new Error('Printer is not ready!');
         }
 
+        console.log("Printer ready, try to print...");
         printer.execute("Print-Job",
             {
                 "operation-attributes-tag": {
@@ -77,6 +78,7 @@ const print = (printer, bufferToBePrinted) => {
                 let jobUri = res['job-attributes-tag']['job-uri'];
                 let tries = 0;
                 let t = setInterval(() => {
+                    console.log("Waiting for response from printer...");
                     printer.execute(
                         "Get-Job-Attributes",
                         {"operation-attributes-tag": {'job-uri': jobUri}},
@@ -91,21 +93,23 @@ const print = (printer, bufferToBePrinted) => {
                                 return;
                             }
 
-                            if (tries++ > 10) {
-                                clearInterval(t);
-                                printer.execute("Cancel-Job", {
-                                    "operation-attributes-tag": {
-                                        //"job-uri":jobUri,  //uncomment this
-                                        "printer-uri": printer.uri, //or uncomment this two lines - one of variants should work!!!
-                                        "job-id": job["job-attributes-tag"]["job-id"]
-                                    }
-                                }, (err, res) => {
-                                    if (err) throw new Error(err);
-                                    console.log('Job with id ' + job["job-attributes-tag"]["job-id"] + ' is being canceled');
-                                });
-
-                                throw new Error('Job is canceled - too many tries and job is not printed!');
+                            if (tries++ < 10) {
+                                return;
                             }
+
+                            clearInterval(t);
+                            printer.execute("Cancel-Job", {
+                                "operation-attributes-tag": {
+                                    //"job-uri":jobUri,  //uncomment this
+                                    "printer-uri": printer.uri, //or uncomment this two lines - one of variants should work!!!
+                                    "job-id": job["job-attributes-tag"]["job-id"]
+                                }
+                            }, (err, res) => {
+                                if (err) throw new Error(err);
+                                console.log('Job with id ' + job["job-attributes-tag"]["job-id"] + ' is being canceled');
+                            });
+
+                            throw new Error('Job cancelled - failed to print!');
                         }
                     );
                 }, 2000);
@@ -116,7 +120,7 @@ const print = (printer, bufferToBePrinted) => {
 app.get('/test', (req, res) => {
     res.send('testing...');
 
-    fs.readFile('print_test.txt',  (err, buffer) => {
+    fs.readFile('print_test.txt', (err, buffer) => {
         if (err) {
             console.error("Failed to read file print_test.txt");
             return;
