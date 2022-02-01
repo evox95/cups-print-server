@@ -6,11 +6,11 @@ const fileUpload = require('express-fileupload');
 const bodyParser = require('body-parser');
 const cors = require('cors');
 const os = require('os');
-require('dotenv').config();
 
+require('dotenv').config();
+const APP_PORT = process.env.PORT || 3000;
 const CUPS_HOST = process.env.CUPS_HOST || '127.0.0.1';
 const CUPS_PORT = process.env.CUPS_PORT || 631;
-const APP_PORT = process.env.PORT || 3000;
 
 const app = express()
 app.use(cors());
