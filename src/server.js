@@ -67,7 +67,8 @@ const print = (printer, bufferToBePrinted) => {
             {
                 "operation-attributes-tag": {
                     "requesting-user-name": "nap",
-                    "job-name": "testing"
+                    // "job-name": "testing",
+                    "document-format": "application/pdf",
                 },
                 "job-attributes-tag": {},
                 data: bufferToBePrinted
