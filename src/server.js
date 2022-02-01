@@ -63,6 +63,16 @@ const print = (printer, bufferToBePrinted, bufferFormat = 'text/plain') => {
         }
 
         console.log("Printer ready, printing...");
+
+        // https://datatracker.ietf.org/doc/html/rfc2911#section-4.2.10
+        const ORIENTATION = {
+            "portrait": 3,
+            "landscape": 4,
+            "reverse-landscape": 5,
+            "reverse-portrait": 6,
+            "none": 0,
+        }
+
         printer.execute(
             "Print-Job",
             {
@@ -70,6 +80,7 @@ const print = (printer, bufferToBePrinted, bufferFormat = 'text/plain') => {
                     "requesting-user-name": "nap",
                     // "job-name": "testing",
                     "document-format": bufferFormat,
+                    "orientation-requested": ORIENTATION['portrait'],
                 },
                 "job-attributes-tag": {},
                 data: bufferToBePrinted
