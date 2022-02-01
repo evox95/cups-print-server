@@ -80,9 +80,10 @@ const print = (printer, bufferToBePrinted, bufferFormat = 'text/plain') => {
                     "requesting-user-name": "nap",
                     // "job-name": "testing",
                     "document-format": bufferFormat,
-                    "orientation-requested-actual": ORIENTATION['portrait'],
                 },
-                "job-attributes-tag": {},
+                "job-attributes-tag": {
+                    "orientation-requested": ORIENTATION['portrait'],
+                },
                 data: bufferToBePrinted
             },
             (err, res) => {
