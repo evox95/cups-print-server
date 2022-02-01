@@ -132,9 +132,9 @@ const print = (printer, bufferToBePrinted) => {
 app.get('/test', (req, res) => {
     res.send('testing...');
 
-    fs.readFile('print_test.txt', (err, buffer) => {
+    fs.readFile('print_test.pdf', (err, buffer) => {
         if (err) {
-            console.error("Failed to read file print_test.txt");
+            console.error("Failed to read file print_test.pdf");
             return;
         }
 
