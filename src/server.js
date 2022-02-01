@@ -49,16 +49,17 @@ const getPrinter = (printerName) => {
  * @param bufferToBePrinted{Buffer}
  */
 const print = (printer, bufferToBePrinted) => {
-    printer.execute("Get-Printer-Attributes", null, (err, printerStatus) => {
+    printer.execute("Get-Printer-Attributes", null, (err, response) => {
         if (err) throw new Error(err);
-        console.log(printerStatus);
 
-        if (printerStatus.statusCode !== 'idle') {
+        if (response?.['printer-attributes-tag']?.['printer-state'] !== 'idle') {
+            console.log(response);
             throw new Error('Printer is not ready!');
         }
 
-        console.log("Printer ready, try to print...");
-        printer.execute("Print-Job",
+        console.log("Printer ready, printing...");
+        printer.execute(
+            "Print-Job",
             {
                 "operation-attributes-tag": {
                     "requesting-user-name": "nap",
@@ -76,9 +77,10 @@ const print = (printer, bufferToBePrinted) => {
                 }
 
                 let jobUri = res['job-attributes-tag']['job-uri'];
-                let tries = 0;
-                let t = setInterval(() => {
-                    console.log("Waiting for response from printer...");
+                let waitingTimeSec = 30;
+                let checkResponseIntervalSec = 2;
+                let waitingForResponseInterval = setInterval(() => {
+                    console.log("Waiting for response from printer... " + waitingTimeSec + "s");
                     printer.execute(
                         "Get-Job-Attributes",
                         {"operation-attributes-tag": {'job-uri': jobUri}},
@@ -87,33 +89,39 @@ const print = (printer, bufferToBePrinted) => {
                             console.log(job);
 
                             if (job && job["job-attributes-tag"]["job-state"] === 'completed') {
-                                clearInterval(t);
+                                clearInterval(waitingForResponseInterval);
                                 console.log('Print success. Job parameters:');
                                 console.log(job);
                                 return;
                             }
 
-                            if (tries++ < 10) {
+                            waitingTimeSec -= checkResponseIntervalSec;
+                            if (waitingTimeSec > 0) {
                                 return;
                             }
 
-                            clearInterval(t);
-                            printer.execute("Cancel-Job", {
-                                "operation-attributes-tag": {
-                                    //"job-uri":jobUri,  //uncomment this
-                                    "printer-uri": printer.uri, //or uncomment this two lines - one of variants should work!!!
-                                    "job-id": job["job-attributes-tag"]["job-id"]
+                            clearInterval(waitingForResponseInterval);
+                            printer.execute(
+                                "Cancel-Job",
+                                {
+                                    "operation-attributes-tag": {
+                                        // "job-uri": jobUri, //uncomment this
+                                        // or uncomment this two lines below - one of variants should work!
+                                        "printer-uri": printer.uri,
+                                        "job-id": job["job-attributes-tag"]["job-id"]
+                                    }
+                                },
+                                (err, res) => {
+                                    if (err) throw new Error(err);
+                                    console.log('Job with id ' + job["job-attributes-tag"]["job-id"] + ' is being canceled');
                                 }
-                            }, (err, res) => {
-                                if (err) throw new Error(err);
-                                console.log('Job with id ' + job["job-attributes-tag"]["job-id"] + ' is being canceled');
-                            });
-
+                            );
                             throw new Error('Job cancelled - failed to print!');
                         }
                     );
-                }, 2000);
-            });
+                }, checkResponseIntervalSec * 1000);
+            }
+        );
     });
 }
 
