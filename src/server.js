@@ -52,7 +52,11 @@ const print = (printer, bufferToBePrinted) => {
     printer.execute("Get-Printer-Attributes", null, (err, response) => {
         if (err) throw new Error(err);
 
-        if (response?.['printer-attributes-tag']?.['printer-state'] !== 'idle') {
+        if (
+            typeof response['printer-attributes-tag'] === 'undefined'
+            || typeof response['printer-attributes-tag']['printer-state'] === 'undefined'
+            || response['printer-attributes-tag']['printer-state'] !== 'idle'
+        ) {
             console.log(response);
             throw new Error('Printer is not ready!');
         }
