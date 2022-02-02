@@ -3,6 +3,7 @@ const request = require('request');
 const fs = require('fs');
 const express = require('express')
 const bodyParser = require('body-parser');
+const formidable = require('formidable');
 const cors = require('cors');
 
 require('dotenv').config();
@@ -16,7 +17,7 @@ const CUPS_PORT = process.env.CUPS_PORT || 631;
 const app = express()
 app.use(cors());
 app.use(bodyParser.urlencoded({limit: '100mb', extended: true}));
-app.use(bodyParser.raw());
+// app.use(bodyParser.json({limit: '100mb'}));
 
 // noinspection HttpUrlsUsage
 const CUPS_URL = `http://${CUPS_HOST}:${CUPS_PORT}/printers/`;
@@ -166,13 +167,8 @@ const print = (
 // /test
 // /test?printer={printer-name}
 app.get('/test', (req, res) => {
-    res.send({success: true});
-
     fs.readFile('print_test.txt', (err, buffer) => {
-        if (err) {
-            console.error("Failed to read file print_test.txt");
-            throw err;
-        }
+        if (err) throw err;
 
         if (!req.query.printer) {
             getPrinterNames((err, printerNames) => {
@@ -185,33 +181,46 @@ app.get('/test', (req, res) => {
             const printer = getPrinter(req.query.printer);
             print(printer, buffer, 'text/plain');
         }
+
+        res.send({success: true});
     });
 })
 
 // /print-document?printer=DYMO_LW_4XL
 // /print-document?printer={printer-name}&orientation={"landscape"|"portrait"|"reverse-landscape"|"reverse-portrait"}
-app.post('/print-document', async (req, res) => {
-    try {
-        if (!req.body) {
+app.post('/print-document', (req, res) => {
+    if (!req.body) {
+        res.send({
+            status: false,
+            success: 'Request body is empty'
+        });
+    } else if (!req.query.printer) {
+        res.send({
+            success: false,
+            message: 'No printer selected'
+        });
+    }
+
+    const form = new formidable.IncomingForm();
+    form.parse(req, function (err, fields, files) {
+        if (err) throw err;
+
+        if (typeof files.document === 'undefined') {
             res.send({
                 status: false,
-                success: 'No file uploaded'
+                success: 'No document uploaded'
             });
-        } else if (!req.query.printer) {
-            res.send({
-                success: false,
-                message: 'No printer selected'
-            });
-        } else {
-            const buffer = Buffer.from(req.body.toString(), "binary");
-            const printer = getPrinter(req.query.printer);
-            print(printer, buffer, 'application/pdf', req.query.orientation);
-            res.send({success: true});
+            return;
         }
-    } catch (err) {
-        console.log(err);
-        res.status(500).send(err.toString());
-    }
+
+        fs.readFile(files.document.filepath, (err, buffer) => {
+            if (err) throw err;
+
+            const printer = getPrinter(req.query.printer);
+            print(printer, buffer, buffer.mimetype, req.query.orientation);
+            res.send({success: true});
+        });
+    });
 })
 
 let server = app;
@@ -222,6 +231,7 @@ if (SSL_ENABLE) {
     }, app);
     console.log('SSL support enabled')
 }
-server.listen(APP_PORT, () => {
+server.listen(APP_PORT, (err) => {
+    if (err) throw err;
     console.log(`CUPS printing server app is listening on port ${APP_PORT}`)
 })
