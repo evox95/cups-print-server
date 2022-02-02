@@ -77,38 +77,22 @@ const print = (
             || typeof response['printer-attributes-tag']['printer-state'] === 'undefined'
             || response['printer-attributes-tag']['printer-state'] !== 'idle'
         ) {
-            console.log(response);
             throw new Error('Printer is not ready!');
         }
 
-        console.log("Printer ready, printing...");
-
-        // https://datatracker.ietf.org/doc/html/rfc2911#section-4.2.10
-        const ORIENTATION = {
-            "portrait": 3,
-            "landscape": 4,
-            "reverse-landscape": 5,
-            "reverse-portrait": 6,
-        }
+        console.log("Printer idle");
+        console.log(response);
 
         const jobOptions = {
             "operation-attributes-tag": {
                 "requesting-user-name": "nap",
                 "document-format": bufferFormat,
-                "orientation-requested": ORIENTATION["portrait"],
             },
-            "job-attributes-tag": {
-                "orientation-requested": ORIENTATION["portrait"],
-            },
-            "printer-attributes-tag": {
-                "orientation-requested": ORIENTATION["portrait"],
-            },
+            "job-attributes-tag": {},
             "data": bufferToBePrinted,
         }
-        if (typeof ORIENTATION[orientation] !== 'undefined') {
-            jobOptions["job-attributes-tag"]["orientation-requested"] = 3;
-            jobOptions["operation-attributes-tag"]["orientation-requested"] = 4;
-            jobOptions["printer-attributes-tag"]["orientation-requested"] = 5;
+        if (response['printer-attributes-tag']['orientation-requested-supported'].indexOf(orientation) >= 0) {
+            jobOptions["job-attributes-tag"]["orientation-requested"] = orientation;
         }
         console.log(jobOptions);
 
