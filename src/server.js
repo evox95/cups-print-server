@@ -5,17 +5,18 @@ const express = require('express')
 const fileUpload = require('express-fileupload');
 const bodyParser = require('body-parser');
 const cors = require('cors');
-const os = require('os');
 
 require('dotenv').config();
 const APP_PORT = process.env.PORT || 3000;
+const SSL_ENABLE = process.env.SSL_ENABLE || false;
+const SSL_KEY = process.env.SSL_KEY || null;
+const SSL_CERT = process.env.SSL_CERT || null;
 const CUPS_HOST = process.env.CUPS_HOST || '127.0.0.1';
 const CUPS_PORT = process.env.CUPS_PORT || 631;
 
 const app = express()
 app.use(cors());
-app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({extended: true}));
+app.use(bodyParser.urlencoded({limit: '10mb', extended: true}));
 app.use(fileUpload({createParentPath: true}));
 
 // noinspection HttpUrlsUsage
@@ -194,39 +195,19 @@ app.get('/test', (req, res) => {
 // /print-document?printer={printer-name}
 app.post('/print-document', async (req, res) => {
     try {
-        if (!req.files) {
+        if (!req.body) {
             res.send({
                 status: false,
                 success: 'No file uploaded'
             });
-        } else if (!req.get('printer')) {
+        } else if (!req.query.printer) {
             res.send({
                 success: false,
                 message: 'No printer selected'
             });
         } else {
-            const document = req.files.document;
-            const documentFilepath = os.tmpdir() + '/' + document.name;
-            await document.mv(documentFilepath);
-
-            fs.readFile(documentFilepath, (err, buffer) => {
-                if (err) {
-                    console.error('Failed to read ' + documentFilepath);
-                    throw err;
-                }
-
-                const printer = getPrinter(req.get('printer'));
-                print(printer, buffer, document.mimetype, (event) => {
-                    switch (event) {
-                        case 'job-sent-to-printer':
-                            fs.unlink(documentFilepath, (err) => {
-                                if (err) throw err;
-                            });
-                            break;
-                    }
-                });
-            });
-
+            const printer = getPrinter(req.get('printer'));
+            print(printer, req.body, 'application/pdf');
             res.send({success: true});
         }
     } catch (err) {
@@ -234,6 +215,13 @@ app.post('/print-document', async (req, res) => {
     }
 })
 
-app.listen(APP_PORT, () => {
+let server = app;
+if (SSL_ENABLE) {
+    server = require('https').createServer({
+        key: fs.readFileSync(SSL_KEY),
+        cert: fs.readFileSync(SSL_CERT),
+    }, app);
+}
+server.listen(APP_PORT, () => {
     console.log(`CUPS printing server app is listening on port ${APP_PORT}`)
 })
