@@ -61,11 +61,13 @@ const getPrinter = (printerName) => {
  * @param printer{Printer}
  * @param bufferToBePrinted{Buffer}
  * @param bufferFormat{string}
+ * @param orientation{"landscape"|"portrait"|"reverse-landscape"|"reverse-portrait"}
  */
 const print = (
     printer,
     bufferToBePrinted,
-    bufferFormat = 'text/plain'
+    bufferFormat = 'text/plain',
+    orientation = 'landscape'
 ) => {
     printer.execute("Get-Printer-Attributes", null, (err, response) => {
         if (err) throw err;
@@ -87,22 +89,27 @@ const print = (
             "landscape": 4,
             "reverse-landscape": 5,
             "reverse-portrait": 6,
-            "none": 0,
         }
+
+        const jobOptions = {
+            "operation-attributes-tag": {
+                "requesting-user-name": "nap",
+                "document-format": bufferFormat,
+            },
+            // https://datatracker.ietf.org/doc/html/rfc2911#section-4.2
+            "job-attributes-tag": {},
+            "data": bufferToBePrinted
+        }
+        if (typeof ORIENTATION[orientation] !== 'undefined') {
+            jobOptions["job-attributes-tag"] = {
+                "orientation-requested": ORIENTATION[orientation],
+            }
+        }
+        console.log(jobOptions);
 
         printer.execute(
             "Print-Job",
-            {
-                "operation-attributes-tag": {
-                    "requesting-user-name": "nap",
-                    "document-format": bufferFormat,
-                },
-                // https://datatracker.ietf.org/doc/html/rfc2911#section-4.2
-                "job-attributes-tag": {
-                    "orientation-requested": ORIENTATION['portrait'],
-                },
-                data: bufferToBePrinted
-            },
+            jobOptions,
             (err, res) => {
                 if (err) throw err;
                 console.log(res);
@@ -128,6 +135,13 @@ const print = (
                                 console.log('Print success. Job parameters:');
                                 console.log(job);
                                 return;
+                            }
+
+                            if (job && job["job-attributes-tag"]["job-state"] === 'processing-stopped') {
+                                clearInterval(waitingForResponseInterval);
+                                console.log('Print failed. Job parameters:');
+                                console.log(job);
+                                throw new Error(job["job-attributes-tag"]["job-printer-state-message"]);
                             }
 
                             waitingTimeSec -= checkResponseIntervalSec;
@@ -186,8 +200,8 @@ app.get('/test', (req, res) => {
 })
 
 // /print-document?printer=DYMO_LW_4XL
-// /print-document?printer={printer-name}
-app.post('/print-document', (req, res) => {
+// /print-document?printer={printer-name}&orientation={"landscape"|"portrait"|"reverse-landscape"|"reverse-portrait"}
+app.post('/print-document', async (req, res) => {
     try {
         if (!req.body) {
             res.send({
@@ -202,7 +216,7 @@ app.post('/print-document', (req, res) => {
         } else {
             const buffer = Buffer.from(req.body.toString(), "binary");
             const printer = getPrinter(req.query.printer);
-            print(printer, buffer, 'application/pdf');
+            print(printer, buffer, 'application/pdf', req.query.orientation);
             res.send({success: true});
         }
     } catch (err) {
