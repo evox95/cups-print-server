@@ -2,7 +2,6 @@ const ipp = require('ipp');
 const request = require('request');
 const fs = require('fs');
 const express = require('express')
-const fileUpload = require('express-fileupload');
 const bodyParser = require('body-parser');
 const cors = require('cors');
 
@@ -16,8 +15,8 @@ const CUPS_PORT = process.env.CUPS_PORT || 631;
 
 const app = express()
 app.use(cors());
-app.use(bodyParser.urlencoded({limit: '10mb', extended: true}));
-app.use(fileUpload({createParentPath: true}));
+app.use(bodyParser.urlencoded({limit: '100mb', extended: true}));
+app.use(bodyParser.raw());
 
 // noinspection HttpUrlsUsage
 const CUPS_URL = `http://${CUPS_HOST}:${CUPS_PORT}/printers/`;
@@ -62,14 +61,11 @@ const getPrinter = (printerName) => {
  * @param printer{Printer}
  * @param bufferToBePrinted{Buffer}
  * @param bufferFormat{string}
- * @param callback{function(string)}
  */
 const print = (
     printer,
     bufferToBePrinted,
-    bufferFormat = 'text/plain',
-    callback = (event) => {
-    }
+    bufferFormat = 'text/plain'
 ) => {
     printer.execute("Get-Printer-Attributes", null, (err, response) => {
         if (err) throw err;
@@ -108,8 +104,6 @@ const print = (
                 data: bufferToBePrinted
             },
             (err, res) => {
-                callback('job-sent-to-printer');
-
                 if (err) throw err;
                 console.log(res);
 
@@ -193,7 +187,7 @@ app.get('/test', (req, res) => {
 
 // /print-document?printer=DYMO_LW_4XL
 // /print-document?printer={printer-name}
-app.post('/print-document', async (req, res) => {
+app.post('/print-document', (req, res) => {
     try {
         if (!req.body) {
             res.send({
@@ -206,12 +200,14 @@ app.post('/print-document', async (req, res) => {
                 message: 'No printer selected'
             });
         } else {
+            const buffer = Buffer.from(req.body.toString(), "binary");
             const printer = getPrinter(req.query.printer);
-            print(printer, req.body, 'application/pdf');
+            print(printer, buffer, 'application/pdf');
             res.send({success: true});
         }
     } catch (err) {
-        res.status(500).send(err);
+        console.log(err);
+        res.status(500).send(err.toString());
     }
 })
 

@@ -6,6 +6,8 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "node-dev src/server.js",
+    "daemon-start": "forever start --silent src/server.js",
+    "daemon-stop": "forever stop --silent src/server.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [
@@ -23,7 +25,7 @@
     "cors": "^2.8.5",
     "dotenv": "^15.0.0",
     "express": "^4.17.2",
-    "express-fileupload": "^1.2.1",
+    "forever": "^4.0.3",
     "fs": "^0.0.1-security",
     "https": "^1.0.0",
     "ipp": "^2.0.1",
