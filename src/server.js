@@ -95,15 +95,20 @@ const print = (
             "operation-attributes-tag": {
                 "requesting-user-name": "nap",
                 "document-format": bufferFormat,
+                "orientation-requested": ORIENTATION["portrait"],
             },
-            // https://datatracker.ietf.org/doc/html/rfc2911#section-4.2
-            "job-attributes-tag": {},
-            "data": bufferToBePrinted
+            "job-attributes-tag": {
+                "orientation-requested": ORIENTATION["portrait"],
+            },
+            "printer-attributes-tag": {
+                "orientation-requested": ORIENTATION["portrait"],
+            },
+            "data": bufferToBePrinted,
         }
         if (typeof ORIENTATION[orientation] !== 'undefined') {
-            jobOptions["job-attributes-tag"] = {
-                "orientation-requested": ORIENTATION[orientation],
-            }
+            jobOptions["job-attributes-tag"]["orientation-requested"] = 3;
+            jobOptions["operation-attributes-tag"]["orientation-requested"] = 4;
+            jobOptions["printer-attributes-tag"]["orientation-requested"] = 5;
         }
         console.log(jobOptions);
 
