@@ -177,7 +177,7 @@ app.get('/test', (req, res) => {
             throw err;
         }
 
-        if (!req.get('printer')) {
+        if (!req.query.printer) {
             getPrinterNames((err, printerNames) => {
                 if (err) throw err;
 
@@ -185,7 +185,7 @@ app.get('/test', (req, res) => {
                 print(printer, buffer, 'text/plain');
             })
         } else {
-            const printer = getPrinter(req.get('printer'));
+            const printer = getPrinter(req.query.printer);
             print(printer, buffer, 'text/plain');
         }
     });
@@ -206,7 +206,7 @@ app.post('/print-document', async (req, res) => {
                 message: 'No printer selected'
             });
         } else {
-            const printer = getPrinter(req.get('printer'));
+            const printer = getPrinter(req.query.printer);
             print(printer, req.body, 'application/pdf');
             res.send({success: true});
         }
