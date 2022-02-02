@@ -7,7 +7,7 @@ const bodyParser = require('body-parser');
 const cors = require('cors');
 
 require('dotenv').config();
-const APP_PORT = process.env.PORT || 3000;
+const APP_PORT = process.env.APP_PORT || 3000;
 const SSL_ENABLE = process.env.SSL_ENABLE || false;
 const SSL_KEY = process.env.SSL_KEY || null;
 const SSL_CERT = process.env.SSL_CERT || null;
@@ -221,6 +221,7 @@ if (SSL_ENABLE) {
         key: fs.readFileSync(SSL_KEY),
         cert: fs.readFileSync(SSL_CERT),
     }, app);
+    console.log('SSL support enabled')
 }
 server.listen(APP_PORT, () => {
     console.log(`CUPS printing server app is listening on port ${APP_PORT}`)
