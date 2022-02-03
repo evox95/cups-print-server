@@ -89,7 +89,9 @@ const print = (
                 "requesting-user-name": "nap",
                 "document-format": bufferFormat,
             },
-            "job-attributes-tag": {},
+            "job-attributes-tag": {
+                "page-ranges": "1",
+            },
             "data": bufferToBePrinted,
         }
         if (response['printer-attributes-tag']['orientation-requested-supported'].indexOf(orientation) >= 0) {
