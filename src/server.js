@@ -217,7 +217,7 @@ app.post('/print-document', (req, res) => {
             if (err) throw err;
 
             const printer = getPrinter(req.query.printer);
-            print(printer, buffer, buffer.mimetype, req.query.orientation);
+            print(printer, buffer, 'application/pdf', req.query.orientation);
             res.send({success: true});
         });
     });
