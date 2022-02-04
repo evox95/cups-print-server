@@ -63,12 +63,14 @@ const getPrinter = (printerName) => {
  * @param bufferToBePrinted{Buffer}
  * @param bufferFormat{string}
  * @param orientation{"landscape"|"portrait"|"reverse-landscape"|"reverse-portrait"}
+ * @param pageRanges{string}
  */
 const print = (
     printer,
     bufferToBePrinted,
     bufferFormat = 'text/plain',
-    orientation = 'landscape'
+    orientation = 'landscape',
+    pageRanges = ''
 ) => {
     printer.execute("Get-Printer-Attributes", null, (err, response) => {
         if (err) throw err;
@@ -89,10 +91,11 @@ const print = (
                 "requesting-user-name": "nap",
                 "document-format": bufferFormat,
             },
-            "job-attributes-tag": {
-                "page-ranges": "1",
-            },
+            "job-attributes-tag": {},
             "data": bufferToBePrinted,
+        }
+        if (pageRanges && pageRanges.match(/^[0-9]+-[0-9]+$/)) {
+            jobOptions["job-attributes-tag"]["page-ranges"] = pageRanges;
         }
         if (response['printer-attributes-tag']['orientation-requested-supported'].indexOf(orientation) >= 0) {
             jobOptions["job-attributes-tag"]["orientation-requested"] = orientation;
@@ -219,7 +222,13 @@ app.post('/print-document', (req, res) => {
             if (err) throw err;
 
             const printer = getPrinter(req.query.printer);
-            print(printer, buffer, 'application/pdf', req.query.orientation);
+            print(
+                printer,
+                buffer,
+                'application/pdf',
+                req.query.orientation,
+                req.query?.pageRanges ?? ''
+            );
             res.send({success: true});
         });
     });
