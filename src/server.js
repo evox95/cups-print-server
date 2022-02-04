@@ -227,7 +227,7 @@ app.post('/print-document', (req, res) => {
                 buffer,
                 'application/pdf',
                 req.query.orientation,
-                req.query?.pageRanges ?? ''
+                req.query.pageRanges ?? ''
             );
             res.send({success: true});
         });
