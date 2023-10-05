@@ -169,6 +169,28 @@ const print = (
     });
 }
 
+// /testzpl
+// /testzpl?printer={printer-name}
+app.get('/testzpl', (req, res) => {
+    fs.readFile('test.zpl', (err, buffer) => {
+        if (err) throw err;
+
+        if (!req.query.printer) {
+            getPrinterNames((err, printerNames) => {
+                if (err) throw err;
+
+                const printer = getPrinter(printerNames[0]);
+                print(printer, buffer, 'application/vnd.cups-raw');
+            })
+        } else {
+            const printer = getPrinter(req.query.printer);
+            print(printer, buffer, 'application/vnd.cups-raw');
+        }
+
+        res.send({success: true});
+    });
+})
+
 // /test
 // /test?printer={printer-name}
 app.get('/test', (req, res) => {
@@ -206,6 +228,16 @@ app.post('/print-document', (req, res) => {
         });
     }
 
+    let contentType = 'pdf';
+    if (req.query && typeof req.query.contentType !== 'undefined') {
+        contentType = req.query.contentType;
+    }
+    if (contentType == 'zpl') {
+        contentType = 'application/vnd.cups-raw';
+    } else {
+        contentType = 'application/pdf';
+    }
+
     const form = new formidable.IncomingForm();
     form.parse(req, function (err, fields, files) {
         if (err) throw err;
@@ -225,7 +257,7 @@ app.post('/print-document', (req, res) => {
             print(
                 printer,
                 buffer,
-                'application/pdf',
+                contentType,
                 req.query.orientation
             );
             res.send({success: true});
